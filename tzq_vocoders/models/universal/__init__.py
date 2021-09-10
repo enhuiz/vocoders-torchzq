@@ -66,7 +66,7 @@ class UniversalVocoder(nn.Module):
             x: conditioned, e.g. mel  (t_m b c_mel)
             y: wavefrom (t_w b), continous [-1, 1]
         Returns:
-            logits: (b c k)
+            nll, the loss
         """
         x = self.encode(x)  # (t b c)
 

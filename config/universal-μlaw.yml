@@ -1,0 +1,13 @@
+runner: python -m tzq_vocoders.runners.universal
+
+dist: μlaw
+
+batch_size: 16
+eval_batch_size: 8
+
+train:
+  max_epochs: 1000
+  save_every_epoch: 10
+  validate_every_epoch: 5
+  grad_clip_thres: 1.0
+  lr: "lambda i: max(4.0e-4 * 0.5 ** (i / 20000), 1e-5)"
