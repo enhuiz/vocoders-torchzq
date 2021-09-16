@@ -76,7 +76,7 @@ class DiscretizedMixtureLogisticsLayer(DistributionLayer):
     def logistics_cdf(self, y, μ, s):
         return ((y - μ) / s).sigmoid()
 
-    def log_prob(self, x, y, ε=1e-12):
+    def log_prob(self, x, y, ε=1e-12, min_logs=-7.0):
         """
         Args:
             x: (t b d)
@@ -90,6 +90,7 @@ class DiscretizedMixtureLogisticsLayer(DistributionLayer):
         y = y.clamp(-0.999 + half_bin_size, 0.999 - half_bin_size)
 
         logits, μ, logs = self.linear(x).chunk(3, dim=-1)
+        logs = logs.clamp(min=min_logs)
         s = logs.exp()
 
         cdf_plus = self.logistics_cdf(y + half_bin_size, μ, s)
