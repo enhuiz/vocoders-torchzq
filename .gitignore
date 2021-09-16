@@ -1,3 +1,5 @@
 tzq_vocoders/version.py
 __pycache__
 data
+wandb
+runs

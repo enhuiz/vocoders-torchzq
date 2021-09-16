@@ -103,8 +103,9 @@ class UniversalVocoder(nn.Module):
             it = torch.cat([et, xt], dim=-1)
             ot, ht = self.wav_rnn(it[None], ht)
             yt = self.dist.sample(ot)
-            y.append(yt)
+            y.append(yt.squeeze(0))
 
+        y = torch.stack(y, dim=1)  # (b t 1)
         y = [yi[:li] for yi, li in zip(y, yl)]
 
         return y
@@ -114,8 +115,8 @@ if __name__ == "__main__":
     from ..distributions import μLawCategoricalLayer, DiscretizedMixtureLogisticsLayer
 
     model = UniversalVocoder(
-        # lambda dim: μLawCategoricalLayer(dim, 9),
-        lambda dim: DiscretizedMixtureLogisticsLayer(dim),
+        lambda dim: μLawCategoricalLayer(dim, 9),
+        # lambda dim: DiscretizedMixtureLogisticsLayer(dim),
         sample_rate=16_000,
         hop_length=256,
         dim_mel=8,

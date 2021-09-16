@@ -10,7 +10,7 @@ from .spectrogram import LogMelSpectrogram
 
 class Cache:
     def __init__(self, root):
-        self.root = root
+        self.root = Path(root)
         self.root.mkdir(exist_ok=True, parents=True)
 
     def write(self, rpath, data, validator):
@@ -34,7 +34,7 @@ class Cache:
 class AudioDataset(Dataset):
     def __init__(self, pattern: str, mel_fn: LogMelSpectrogram):
         super().__init__()
-        self.paths = sorted(glob.glob(pattern, recusive=True))
+        self.paths = sorted(glob.glob(pattern, recursive=True))
         self.mel_fn = mel_fn
         self.cache = Cache(".cache")
 
@@ -51,8 +51,8 @@ class AudioDataset(Dataset):
         if mel is None:
             wav = self.load_wav(path) if wav is None else wav
             with torch.no_grad():
-                wav = torch.from_numpy(wav)  # (t c)
-                mel = self.mel_fn(wav, dim=0).numpy()  # (t c d)
+                wav = torch.from_numpy(wav)  # (t)
+                mel = self.mel_fn(wav, dim=0).numpy()  # (t d)
             self.cache.write(rpath, mel, validator)
         return mel
 

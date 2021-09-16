@@ -1,0 +1,3 @@
+default: config/universal-μlaw.yml
+
+dist: mol

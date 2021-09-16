@@ -51,7 +51,7 @@ class Runner(torchzq.Runner):
 
         return dataloader
 
-    def crop(self, x, rate, mode):
+    def crop_to_tensor(self, x, rate, mode):
         args = self.args
         crop_length = int(rate * args.crop_seconds)
         if len(x) < crop_length:
@@ -62,14 +62,17 @@ class Runner(torchzq.Runner):
         else:
             # center crop
             start = (len(x) - crop_length) // 2
-        return x[start : start + crop_length]
+        x = x[start : start + crop_length]
+        x = torch.from_numpy(x)
+        return x
 
     def prepare_batch(self, batch, mode):
         mel = batch["mel"]  # list of (t c)
         wav = batch["wav"]  # list of (t)
-        mel = [self.crop(m, self.mel_fn.rate, mode) for m in mel]
-        wav = [self.crop(w, self.mel_fn.sample_rate, mode) for w in wav]
-        return dict(mel=pad_sequence(mel), wav=pad_sequence(wav))
+        mel = [self.crop_to_tensor(m, self.mel_fn.rate, mode) for m in mel]
+        wav = [self.crop_to_tensor(w, self.mel_fn.sample_rate, mode) for w in wav]
+        batch = dict(mel=pad_sequence(mel), wav=pad_sequence(wav))
+        return super().prepare_batch(batch, mode)
 
     def training_step(self, batch, _):
         loss = self.model(x=batch["mel"], y=batch["wav"])
@@ -122,6 +125,9 @@ class Runner(torchzq.Runner):
         logger.log(log_dict, self.global_step)
 
         return stat_dict
+
+    def testing_step(self, batch, batch_idx):
+        raise NotImplementedError
 
 
 def main():

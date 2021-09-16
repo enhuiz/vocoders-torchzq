@@ -5,6 +5,9 @@ dist: μlaw
 batch_size: 16
 eval_batch_size: 8
 
+training_glob: "data/train/**/*.flac"
+validation_glob: "data/val/**/*.flac"
+
 train:
   max_epochs: 1000
   save_every_epoch: 10

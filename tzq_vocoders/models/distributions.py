@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+from functools import cached_property
 from abc import ABC, abstractmethod
 
 
@@ -19,6 +20,10 @@ class DistributionLayer(ABC, nn.Module):
     def sample(self, x) -> torch.Tensor:
         ...
 
+    @property
+    def device(self):
+        return next(self.parameters()).device
+
 
 class μLawCategoricalLayer(DistributionLayer):
     def __init__(self, input_dim, bits=9):
@@ -28,7 +33,7 @@ class μLawCategoricalLayer(DistributionLayer):
 
     @property
     def num_quants(self):
-        return self.bits ** 2
+        return 2 ** self.bits
 
     @property
     def μ(self):
@@ -55,7 +60,7 @@ class μLawCategoricalLayer(DistributionLayer):
     def sample(self, x):
         logits = self.linear(x)
         if self.training:
-            z = F.gumbel_softmax(logits, 1, hard=True)
+            z = Categorical(logits=logits).sample()
         else:
             z = logits.argmax(dim=-1)
         z = self.μ_law_decode(z)
@@ -97,7 +102,7 @@ class DiscretizedMixtureLogisticsLayer(DistributionLayer):
     def sample(self, x):
         logits, μ, logs = self.linear(x).chunk(3, dim=-1)
 
-        k = Categorical(logits=logits).sample().unsqueeze(1)  # (... ncomp 1)
+        k = Categorical(logits=logits).sample().unsqueeze(-1)  # (... 1)
 
         μ = μ.gather(dim=-1, index=k).squeeze(-1)
         logs = logs.gather(dim=-1, index=k).squeeze(-1)
