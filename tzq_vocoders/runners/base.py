@@ -19,6 +19,7 @@ class Runner(torchzq.Runner):
         crop_seconds: float = 0.8,
         n_demos: int = 4,
         eval_batch_size: int = 8,
+        wandb_project: str = "vocoders",
         **kwargs,
     ):
         super().__init__(**kwargs)
