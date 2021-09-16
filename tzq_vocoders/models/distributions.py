@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from functools import cached_property
 from abc import ABC, abstractmethod
 
 
@@ -82,6 +81,8 @@ class DiscretizedMixtureLogisticsLayer(DistributionLayer):
         Args:
             x: (t b d)
             y: (t b)
+        Returns:
+            log_prob: (t b)
         """
         y = y.unsqueeze(-1)  # (t b) -> (t b 1)
 
@@ -93,6 +94,7 @@ class DiscretizedMixtureLogisticsLayer(DistributionLayer):
         cdf_delta = (cdf_plus - cdf_minus).clamp(min=ε)  # will this simple clamp work?
 
         log_prob = cdf_delta.log() + F.log_softmax(logits, dim=-1)
+        log_prob = log_prob.logsumexp(dim=-1)
 
         return log_prob
 
