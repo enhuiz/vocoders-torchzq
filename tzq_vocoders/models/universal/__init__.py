@@ -112,11 +112,16 @@ class UniversalVocoder(nn.Module):
 
 
 if __name__ == "__main__":
-    from ..distributions import μLawCategoricalLayer, DiscretizedMixtureLogisticsLayer
+    from ..distributions import (
+        MuLawCategoricalLayer,
+        DiscretizedMixtureLogisticsLayer,
+        RawCategoricalLayer,
+    )
 
     model = UniversalVocoder(
-        lambda dim: μLawCategoricalLayer(dim, 9),
+        lambda dim: MuLawCategoricalLayer(dim, 9),
         # lambda dim: DiscretizedMixtureLogisticsLayer(dim),
+        # lambda dim: RawCategoricalLayer(dim),
         sample_rate=16_000,
         hop_length=256,
         dim_mel=8,

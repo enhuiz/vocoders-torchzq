@@ -24,7 +24,7 @@ class DistributionLayer(ABC, nn.Module):
         return next(self.parameters()).device
 
 
-class μLawCategoricalLayer(DistributionLayer):
+class RawCategoricalLayer(DistributionLayer):
     def __init__(self, input_dim, bits=9):
         super().__init__()
         self.bits = bits
@@ -34,27 +34,18 @@ class μLawCategoricalLayer(DistributionLayer):
     def num_quants(self):
         return 2 ** self.bits
 
-    @property
-    def μ(self):
-        return self.num_quants - 1
-
-    def μ_law_encode(self, x):
-        x = x.clamp(-1, 1)
-        x = x.sign() * ((self.μ * x.abs()).log1p() / math.log1p(self.μ))
-        return ((x + 1) / 2 * self.μ + 0.5).long()
-
-    def μ_law_decode(self, x):
-        x = (x - 0.5) / self.μ * 2 - 1
-        x = (x.sign() / self.μ) * ((1 + self.μ) ** x.abs() - 1)
-        return x.clamp(-1, 1)
-
     def log_prob(self, x, y):
         return self.neg_log_prob(x, y).neg()
 
+    def quantize(self, y):
+        return (((y + 1) / 2) * self.num_quants).long()
+
+    def dequantize(self, y):
+        return (y / self.num_quants) * 2 - 1
+
     def neg_log_prob(self, x, y):
         logits = self.linear(x).transpose(-1, -2)  # (t c b)
-        y = self.μ_law_encode(y)  # (t b)
-        return F.cross_entropy(logits, y, reduction="none")
+        return F.cross_entropy(logits, self.quantize(y), reduction="none")
 
     def sample(self, x):
         logits = self.linear(x)
@@ -62,8 +53,24 @@ class μLawCategoricalLayer(DistributionLayer):
             z = Categorical(logits=logits).sample()
         else:
             z = logits.argmax(dim=-1)
-        z = self.μ_law_decode(z)
+        z = self.dequantize(z)
         return z
+
+
+class MuLawCategoricalLayer(RawCategoricalLayer):
+    @property
+    def μ(self):
+        return self.num_quants - 1
+
+    def quantize(self, y):
+        y = y.clamp(-1, 1)
+        y = y.sign() * ((self.μ * y.abs()).log1p() / math.log1p(self.μ))
+        return ((y + 1) / 2 * self.μ + 0.5).long()
+
+    def dequantize(self, y):
+        y = (y - 0.5) / self.μ * 2 - 1
+        y = (y.sign() / self.μ) * ((1 + self.μ) ** y.abs() - 1)
+        return y.clamp(-1, 1)
 
 
 class DiscretizedMixtureLogisticsLayer(DistributionLayer):
