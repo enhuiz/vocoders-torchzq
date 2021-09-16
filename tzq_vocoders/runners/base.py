@@ -96,16 +96,19 @@ class Runner(torchzq.Runner):
         log_dict = {"epoch": self.current_epoch}
 
         fwav = self.model.generate(list(batch["mel"].transpose(0, 1)))
-        fmel = [self.mel_fn(x.cpu(), dim=-1) for x in fwav]
+        fmel = [self.mel_fn(x.cpu(), dim=0) for x in fwav]
 
-        make_wav = lambda x: logger.Audio(x.cpu().detach(), args.sample_rate)
+        make_wav = lambda x: logger.Audio(x.cpu().detach(), self.mel_fn.sample_rate)
         make_mel = lambda x: logger.Image(plot_tensor_to_numpy(x))
 
         mel_mses = []
 
         for i, (wav_i, mel_i), (fwav_i, fmel_i) in zip(
             range(batch_idx * args.eval_batch_size, args.n_demos),
-            zip(batch["wav"], batch["mel"]),
+            zip(
+                batch["wav"].transpose(0, 1),
+                batch["mel"].transpose(0, 1),
+            ),
             zip(fwav, fmel),
         ):
             if self.plot_gt:

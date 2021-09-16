@@ -105,7 +105,7 @@ class UniversalVocoder(nn.Module):
             yt = self.dist.sample(ot)
             y.append(yt.squeeze(0))
 
-        y = torch.stack(y, dim=1)  # (b t 1)
+        y = torch.stack(y, dim=1)  # (b t)
         y = [yi[:li] for yi, li in zip(y, yl)]
 
         return y
