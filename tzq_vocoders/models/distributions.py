@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions import Categorical
 from abc import ABC, abstractmethod
 
 
@@ -59,3 +60,51 @@ class μLawCategoricalLayer(DistributionLayer):
             z = logits.argmax(dim=-1)
         z = self.μ_law_decode(z)
         return z
+
+
+class DiscretizedMixtureLogisticsLayer(DistributionLayer):
+    def __init__(self, input_dim, num_mixtures=10, num_quants=256):
+        super().__init__()
+        self.num_quants = num_quants
+        self.num_mixtures = num_mixtures
+        self.linear = nn.Linear(input_dim, num_mixtures * 3)
+
+    def logistics_cdf(self, y, μ, s):
+        return ((y - μ) / s).sigmoid()
+
+    def log_prob(self, x, y, ε=1e-12):
+        """
+        Args:
+            x: (t b d)
+            y: (t b)
+        """
+        y = y.unsqueeze(-1)  # (t b) -> (t b 1)
+
+        logits, μ, logs = self.linear(x).chunk(3, dim=-1)
+        s = logs.exp()
+
+        cdf_plus = self.logistics_cdf(y + 1 / self.num_quants, μ, s).log()
+        cdf_minus = self.logistics_cdf(y - 1 / self.num_quants, μ, s).log()
+        cdf_delta = (cdf_plus - cdf_minus).clamp(min=ε)  # will this simple clamp work?
+
+        log_prob = cdf_delta.log() + F.log_softmax(logits, dim=-1)
+
+        return log_prob
+
+    def neg_log_prob(self, x, y):
+        return self.log_prob(x, y).neg()
+
+    def sample(self, x):
+        logits, μ, logs = self.linear(x).chunk(3, dim=-1)
+
+        k = Categorical(logits=logits).sample().unsqueeze(1)  # (... ncomp 1)
+
+        μ = μ.gather(dim=-1, index=k).squeeze(-1)
+        logs = logs.gather(dim=-1, index=k).squeeze(-1)
+
+        p = torch.rand_like(μ) * (1 - 1e-5) + 1e-5
+        y = μ + logs.exp() * (p.log() - (1 - p).log())
+
+        y = y.clamp(-1, 1)
+
+        return y

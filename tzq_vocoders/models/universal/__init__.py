@@ -9,7 +9,7 @@ from torch.nn.utils.rnn import pad_sequence
 from typing import Callable
 
 from ..utils import tbc2bct, bct2tbc
-from ..distributions import DistributionLayer, μLawCategoricalLayer
+from ..distributions import DistributionLayer
 from ..layers import PositionalEncoding
 
 
@@ -111,8 +111,11 @@ class UniversalVocoder(nn.Module):
 
 
 if __name__ == "__main__":
+    from ..distributions import μLawCategoricalLayer, DiscretizedMixtureLogisticsLayer
+
     model = UniversalVocoder(
-        lambda dim: μLawCategoricalLayer(dim, 9),
+        # lambda dim: μLawCategoricalLayer(dim, 9),
+        lambda dim: DiscretizedMixtureLogisticsLayer(dim),
         sample_rate=16_000,
         hop_length=256,
         dim_mel=8,
