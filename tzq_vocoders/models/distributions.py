@@ -83,8 +83,8 @@ class DiscretizedMixtureLogisticsLayer(DistributionLayer):
         logits, μ, logs = self.linear(x).chunk(3, dim=-1)
         s = logs.exp()
 
-        cdf_plus = self.logistics_cdf(y + 1 / self.num_quants, μ, s).log()
-        cdf_minus = self.logistics_cdf(y - 1 / self.num_quants, μ, s).log()
+        cdf_plus = self.logistics_cdf(y + 1 / self.num_quants, μ, s)
+        cdf_minus = self.logistics_cdf(y - 1 / self.num_quants, μ, s)
         cdf_delta = (cdf_plus - cdf_minus).clamp(min=ε)  # will this simple clamp work?
 
         log_prob = cdf_delta.log() + F.log_softmax(logits, dim=-1)
