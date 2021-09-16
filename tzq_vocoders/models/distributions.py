@@ -34,14 +34,18 @@ class RawCategoricalLayer(DistributionLayer):
     def num_quants(self):
         return 2 ** self.bits
 
+    @property
+    def μ(self):
+        return self.num_quants - 1
+
     def log_prob(self, x, y):
         return self.neg_log_prob(x, y).neg()
 
     def quantize(self, y):
-        return (((y + 1) / 2) * self.num_quants).long()
+        return (((y.clamp(-1, 1) + 1) / 2) * self.μ).long()
 
     def dequantize(self, y):
-        return (y / self.num_quants) * 2 - 1
+        return ((y / self.μ) * 2 - 1).clamp(-1, 1)
 
     def neg_log_prob(self, x, y):
         logits = self.linear(x).transpose(-1, -2)  # (t c b)
@@ -58,10 +62,6 @@ class RawCategoricalLayer(DistributionLayer):
 
 
 class MuLawCategoricalLayer(RawCategoricalLayer):
-    @property
-    def μ(self):
-        return self.num_quants - 1
-
     def quantize(self, y):
         y = y.clamp(-1, 1)
         y = y.sign() * ((self.μ * y.abs()).log1p() / math.log1p(self.μ))
