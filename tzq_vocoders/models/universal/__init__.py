@@ -94,12 +94,14 @@ class UniversalVocoder(nn.Module):
         wl = (xl * self.hop_length).long()
 
         x = self.encode(pad_sequence(x))
-        w = []
+
+        w0 = torch.zeros((x.shape[1],), device=self.device)
+        w = [w0]
 
         ht = None
-        wt = torch.zeros((x.shape[1],), device=self.device)
-        for xt in tqdm.tqdm(x, "Decoding ...") if verbose else x:
-            et = self.wav_emb(wt)
+        pbar = tqdm.tqdm(x, "Decoding ...") if verbose else x
+        for t, xt in enumerate(pbar):
+            et = self.wav_emb(w[t])
             it = torch.cat([et, xt], dim=-1)
             ot, ht = self.wav_rnn(it[None], ht)
             wt = self.dist.sample(ot.squeeze(0))
