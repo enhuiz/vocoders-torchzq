@@ -16,7 +16,7 @@ class Runner(torchzq.Runner):
         self,
         training_glob: str = "data/train/*.wav",
         validation_glob: str = "data/val/*.wav",
-        crop_seconds: float = 0.8,
+        crop_seconds: float = 0.64,
         n_demos: int = 4,
         eval_batch_size: int = 8,
         wandb_project: str = "vocoders",
