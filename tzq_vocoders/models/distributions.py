@@ -100,8 +100,8 @@ class DiscretizedMixtureLogisticsLayer(DiscretizedDistributionLayer):
         """
         half_bin_size = 1 / self.num_quants_minus_1
 
+        y = (0.999 - half_bin_size) * y.clamp(-1, 1)
         y = y.unsqueeze(-1)  # (t b) -> (t b 1)
-        y = y.clamp(-0.999 + half_bin_size, 0.999 - half_bin_size)
 
         logits, μ, logs = self.linear(x).chunk(3, dim=-1)
         logs = logs.clamp(min=min_logs)
