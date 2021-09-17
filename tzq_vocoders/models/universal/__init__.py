@@ -22,6 +22,7 @@ class UniversalVocoder(nn.Module):
     dim_enc: int = 128
     dim_emb: int = 256
     dim_dec: int = 896
+    dim_proj: int = 512
 
     def __post_init__(self):
         super().__init__()
@@ -38,7 +39,11 @@ class UniversalVocoder(nn.Module):
             2 * self.dim_enc + self.dim_emb,
             self.dim_dec,
         )
-        self.dist = self.dist_fn(self.dim_dec)
+        self.proj = nn.Sequential(
+            nn.Linear(self.dim_dec, self.dim_proj),
+            nn.GELU(),
+        )
+        self.dist = self.dist_fn(self.dim_proj)
 
     @property
     def device(self):
@@ -76,6 +81,7 @@ class UniversalVocoder(nn.Module):
 
         e = self.wav_emb(w)  # (t b d)
         o, _ = self.wav_rnn(torch.cat([e, x], dim=-1))
+        o = self.proj(o)
 
         # average over time, average over batch
         nll = self.dist.neg_log_prob(o, y).mean()
@@ -104,7 +110,8 @@ class UniversalVocoder(nn.Module):
             et = self.wav_emb(w[t])
             it = torch.cat([et, xt], dim=-1)
             ot, ht = self.wav_rnn(it[None], ht)
-            wt = self.dist.sample(ot.squeeze(0))
+            ot = self.proj(ot.squeeze(0))
+            wt = self.dist.sample(ot)
             w.append(wt)
 
         w = torch.stack(w[1:], dim=1)  # (b t), [1:] to remove w0
@@ -129,6 +136,7 @@ if __name__ == "__main__":
         dim_mel=8,
         dim_emb=10,
         dim_dec=10,
+        dim_proj=10,
     )
     mel = torch.randn(1, 3, 8)
     wav = torch.rand(256, 3) * 2 - 1
