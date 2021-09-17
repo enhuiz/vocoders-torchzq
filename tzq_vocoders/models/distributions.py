@@ -6,7 +6,11 @@ from torch.distributions import Categorical
 from abc import ABC, abstractmethod
 
 
-class DistributionLayer(ABC, nn.Module):
+class DiscretizedDistributionLayer(ABC, nn.Module):
+    def __init__(self, bits=9):
+        super().__init__()
+        self.bits = bits
+
     @abstractmethod
     def log_prob(self, x, y) -> torch.Tensor:
         ...
@@ -23,29 +27,29 @@ class DistributionLayer(ABC, nn.Module):
     def device(self):
         return next(self.parameters()).device
 
-
-class RawCategoricalLayer(DistributionLayer):
-    def __init__(self, input_dim, bits=9):
-        super().__init__()
-        self.bits = bits
-        self.linear = nn.Linear(input_dim, self.num_quants)
-
     @property
     def num_quants(self):
         return 2 ** self.bits
 
     @property
-    def μ(self):
+    def num_quants_minus_1(self):
         return self.num_quants - 1
+
+    def quantize(self, y):
+        y = y.clamp(-1, 1)
+        return (((y + 1) / 2) * self.num_quants_minus_1).long()
+
+
+class RawCategoricalLayer(DiscretizedDistributionLayer):
+    def __init__(self, input_dim, bits=9):
+        super().__init__(bits)
+        self.linear = nn.Linear(input_dim, self.num_quants)
 
     def log_prob(self, x, y):
         return self.neg_log_prob(x, y).neg()
 
-    def quantize(self, y):
-        return (((y.clamp(-1, 1) + 1) / 2) * self.μ).long()
-
     def dequantize(self, y):
-        return ((y / self.μ) * 2 - 1).clamp(-1, 1)
+        return ((y / self.num_quants_minus_1) * 2 - 1).clamp(-1, 1)
 
     def neg_log_prob(self, x, y):
         logits = self.linear(x).transpose(-1, -2)  # (t c b)
@@ -62,6 +66,10 @@ class RawCategoricalLayer(DistributionLayer):
 
 
 class MuLawCategoricalLayer(RawCategoricalLayer):
+    @property
+    def μ(self):
+        return self.num_quants_minus_1
+
     def quantize(self, y):
         y = y.clamp(-1, 1)
         y = y.sign() * ((self.μ * y.abs()).log1p() / math.log1p(self.μ))
@@ -73,10 +81,9 @@ class MuLawCategoricalLayer(RawCategoricalLayer):
         return y.clamp(-1, 1)
 
 
-class DiscretizedMixtureLogisticsLayer(DistributionLayer):
-    def __init__(self, input_dim, num_mixtures=10, num_quants=256):
-        super().__init__()
-        self.num_quants = num_quants
+class DiscretizedMixtureLogisticsLayer(DiscretizedDistributionLayer):
+    def __init__(self, input_dim, num_mixtures=10):
+        super().__init__(bits=8)
         self.num_mixtures = num_mixtures
         self.linear = nn.Linear(input_dim, num_mixtures * 3)
 
@@ -91,7 +98,7 @@ class DiscretizedMixtureLogisticsLayer(DistributionLayer):
         Returns:
             log_prob: (t b)
         """
-        half_bin_size = 1 / self.num_quants
+        half_bin_size = 1 / self.num_quants_minus_1
 
         y = y.unsqueeze(-1)  # (t b) -> (t b 1)
         y = y.clamp(-0.999 + half_bin_size, 0.999 - half_bin_size)

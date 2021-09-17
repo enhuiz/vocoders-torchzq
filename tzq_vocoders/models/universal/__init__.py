@@ -9,37 +9,38 @@ from torch.nn.utils.rnn import pad_sequence
 from typing import Callable
 
 from ..utils import tbc2bct, bct2tbc
-from ..distributions import DistributionLayer
-from ..layers import PositionalEncoding
+from ..distributions import DiscretizedDistributionLayer
+
+# from ..layers import PositionalEncoding
 
 
 @dataclass(eq=False)
 class UniversalVocoder(nn.Module):
-    dist_fn: Callable[..., DistributionLayer]
+    dist_fn: Callable[..., DiscretizedDistributionLayer]
     sample_rate: int
     hop_length: int
     dim_mel: int
     dim_enc: int = 128
     dim_emb: int = 256
     dim_dec: int = 896
-    dim_affine: int = 512
 
     def __post_init__(self):
         super().__init__()
+        self.dist = self.dist_fn(self.dim_dec)
         self.mel_rnn = nn.GRU(
             self.dim_mel,
             self.dim_enc,
             num_layers=2,
             bidirectional=True,
         )
-        self.wav_emb = PositionalEncoding(
+        self.wav_emb = nn.Embedding(
+            self.dist.num_quants,
             self.dim_emb,
         )
         self.wav_rnn = nn.GRU(
             2 * self.dim_enc + self.dim_emb,
             self.dim_dec,
         )
-        self.dist = self.dist_fn(self.dim_dec)
 
     @property
     def device(self):
@@ -73,7 +74,7 @@ class UniversalVocoder(nn.Module):
         # insert y0, remove the last y, name it as "i" for input
         y0 = torch.zeros((1, x.shape[1]), device=self.device)
         w = torch.cat([y0, y[:-1]])  # (t b)
-        e = self.wav_emb(w)  # (t b d)
+        e = self.wav_emb(self.dist.quantize(w))  # (t b d)
 
         o, _ = self.wav_rnn(torch.cat([e, x], dim=-1))
 
@@ -99,7 +100,7 @@ class UniversalVocoder(nn.Module):
         ht = None
         wt = torch.zeros((x.shape[1],), device=self.device)
         for xt in tqdm.tqdm(x, "Decoding ...") if verbose else x:
-            et = self.wav_emb(wt)
+            et = self.wav_emb(self.dist.quantize(wt))
             it = torch.cat([et, xt], dim=-1)
             ot, ht = self.wav_rnn(it[None], ht)
             yt = self.dist.sample(ot)
