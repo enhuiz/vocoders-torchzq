@@ -35,10 +35,6 @@ class DiscretizedDistributionLayer(ABC, nn.Module):
     def num_quants_minus_1(self):
         return self.num_quants - 1
 
-    def quantize(self, y):
-        y = y.clamp(-1, 1)
-        return (((y + 1) / 2) * self.num_quants_minus_1).long()
-
 
 class RawCategoricalLayer(DiscretizedDistributionLayer):
     def __init__(self, input_dim, bits=9):
@@ -47,6 +43,10 @@ class RawCategoricalLayer(DiscretizedDistributionLayer):
 
     def log_prob(self, x, y):
         return self.neg_log_prob(x, y).neg()
+
+    def quantize(self, y):
+        y = y.clamp(-1, 1)
+        return (((y + 1) / 2) * self.num_quants_minus_1).long()
 
     def dequantize(self, y):
         return ((y / self.num_quants_minus_1) * 2 - 1).clamp(-1, 1)

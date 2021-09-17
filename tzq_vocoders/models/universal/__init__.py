@@ -10,8 +10,7 @@ from typing import Callable
 
 from ..utils import tbc2bct, bct2tbc
 from ..distributions import DiscretizedDistributionLayer
-
-# from ..layers import PositionalEncoding
+from ..layers import PositionalEncoding
 
 
 @dataclass(eq=False)
@@ -26,21 +25,20 @@ class UniversalVocoder(nn.Module):
 
     def __post_init__(self):
         super().__init__()
-        self.dist = self.dist_fn(self.dim_dec)
         self.mel_rnn = nn.GRU(
             self.dim_mel,
             self.dim_enc,
             num_layers=2,
             bidirectional=True,
         )
-        self.wav_emb = nn.Embedding(
-            self.dist.num_quants,
+        self.wav_emb = PositionalEncoding(
             self.dim_emb,
         )
         self.wav_rnn = nn.GRU(
             2 * self.dim_enc + self.dim_emb,
             self.dim_dec,
         )
+        self.dist = self.dist_fn(self.dim_dec)
 
     @property
     def device(self):
@@ -71,11 +69,12 @@ class UniversalVocoder(nn.Module):
         """
         x = self.encode(x)  # (t b c)
 
-        # insert y0, remove the last y, name it as "i" for input
-        y0 = torch.zeros((1, x.shape[1]), device=self.device)
-        w = torch.cat([y0, y[:-1]])  # (t b)
-        e = self.wav_emb(self.dist.quantize(w))  # (t b d)
+        # insert w0, remove the last y, name it as "i" for input
+        # use w for predicted y
+        w0 = torch.zeros((1, x.shape[1]), device=self.device)
+        w = torch.cat([w0, y[:-1]])  # (t b)
 
+        e = self.wav_emb(w)  # (t b d)
         o, _ = self.wav_rnn(torch.cat([e, x], dim=-1))
 
         # average over time, average over batch
@@ -92,24 +91,24 @@ class UniversalVocoder(nn.Module):
             y: list of tensor (t)
         """
         xl = torch.tensor(list(map(len, x)))
-        yl = (xl * self.hop_length).long()
+        wl = (xl * self.hop_length).long()
 
         x = self.encode(pad_sequence(x))
-        y = []
+        w = []
 
         ht = None
-        yt = torch.zeros((x.shape[1],), device=self.device)
+        wt = torch.zeros((x.shape[1],), device=self.device)
         for xt in tqdm.tqdm(x, "Decoding ...") if verbose else x:
-            et = self.wav_emb(self.dist.quantize(yt))
+            et = self.wav_emb(wt)
             it = torch.cat([et, xt], dim=-1)
             ot, ht = self.wav_rnn(it[None], ht)
-            yt = self.dist.sample(ot.squeeze(0))
-            y.append(yt)
+            wt = self.dist.sample(ot.squeeze(0))
+            w.append(wt)
 
-        y = torch.stack(y, dim=1)  # (b t)
-        y = [yi[:li] for yi, li in zip(y, yl)]
+        w = torch.stack(w, dim=1)  # (b t)
+        w = [yi[:li] for yi, li in zip(w, wl)]
 
-        return y
+        return w
 
 
 if __name__ == "__main__":
