@@ -98,13 +98,13 @@ class UniversalVocoder(nn.Module):
         y = []
 
         ht = None
-        wt = torch.zeros((x.shape[1],), device=self.device)
+        yt = torch.zeros((x.shape[1],), device=self.device)
         for xt in tqdm.tqdm(x, "Decoding ...") if verbose else x:
-            et = self.wav_emb(self.dist.quantize(wt))
+            et = self.wav_emb(self.dist.quantize(yt))
             it = torch.cat([et, xt], dim=-1)
             ot, ht = self.wav_rnn(it[None], ht)
-            yt = self.dist.sample(ot)
-            y.append(yt.squeeze(0))
+            yt = self.dist.sample(ot.squeeze(0))
+            y.append(yt)
 
         y = torch.stack(y, dim=1)  # (b t)
         y = [yi[:li] for yi, li in zip(y, yl)]
