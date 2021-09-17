@@ -69,8 +69,8 @@ class UniversalVocoder(nn.Module):
         """
         x = self.encode(x)  # (t b c)
 
-        # insert w0, remove the last y, name it as "i" for input
-        # use w for predicted y
+        # w: the y as input
+        # insert w0, remove the last y
         w0 = torch.zeros((1, x.shape[1]), device=self.device)
         w = torch.cat([w0, y[:-1]])  # (t b)
 
@@ -105,8 +105,8 @@ class UniversalVocoder(nn.Module):
             wt = self.dist.sample(ot.squeeze(0))
             w.append(wt)
 
-        w = torch.stack(w, dim=1)  # (b t)
-        w = [yi[:li] for yi, li in zip(w, wl)]
+        w = torch.stack(w[1:], dim=1)  # (b t), [1:] to remove w0
+        w = [wi[:li] for wi, li in zip(w, wl)]
 
         return w
 
