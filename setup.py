@@ -21,7 +21,7 @@ def write_version(version_core, pre_release=True):
     else:
         version = version_core
 
-    with open(Path("tzq_vocoders", "version.py"), "w") as f:
+    with open(Path("vocoders_torchzq", "version.py"), "w") as f:
         f.write('__version__ = "{}"\n'.format(version))
 
     return version
@@ -31,10 +31,10 @@ with open("README.md", "r") as f:
     long_description = f.read()
 
 setup(
-    name="tzq_vocoders",
+    name="vocoders-torchzq",
     python_requires=">=3.9.0",
     version=write_version("0.0.1", True),
-    description="A collection of vocoders with TorchZQ.",
+    description="A collection of vocoders based on TorchZQ.",
     author="enhuiz",
     author_email="niuzhe.nz@outlook.com",
     long_description=long_description,
@@ -43,5 +43,5 @@ setup(
     install_requires=[
         "torchzq>=1.0.10.dev20210906204530",
     ],
-    url="https://github.com/enhuiz/tzq-vocoders",
+    url="https://github.com/enhuiz/vocoders-torchzq",
 )

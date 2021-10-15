@@ -1,3 +1,3 @@
-# A collection of vocoders with TorchZQ
+# A collection of vocoders based on TorchZQ (WIP)
 
-WIP.
+
