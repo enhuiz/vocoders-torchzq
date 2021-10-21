@@ -57,10 +57,7 @@ class RawCategoricalLayer(DiscretizedDistributionLayer):
 
     def sample(self, x):
         logits = self.linear(x)
-        if self.training:
-            z = Categorical(logits=logits).sample()
-        else:
-            z = logits.argmax(dim=-1)
+        z = Categorical(logits=logits).sample()
         z = self.dequantize(z)
         return z
 
