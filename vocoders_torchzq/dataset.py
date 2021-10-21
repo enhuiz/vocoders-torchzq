@@ -1,3 +1,4 @@
+import csv
 import attr
 import numpy as np
 import pandas as pd
@@ -47,7 +48,10 @@ class AudioDataset(Dataset, MultimodalDataset):
         mel_folder="mel",
         mel_suffix=".npz",
     ):
-        df = pd.read_csv((root / split).with_suffix(".csv"))
+        path = (root / split).with_suffix(".csv")
+        df: pd.DataFrame = pd.read_csv(path, sep="|", quoting=csv.QUOTE_NONE, dtype=str)
+        df = df.fillna("")
+
         super().__init__(
             [
                 AudioSample(str(id), trim_randomly, trim_seconds)
