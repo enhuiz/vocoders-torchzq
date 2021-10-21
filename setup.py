@@ -42,6 +42,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "torchzq>=1.0.10.dev20210906204530",
+        "mmds>=0.0.1.dev20211020213045",
     ],
     url="https://github.com/enhuiz/vocoders-torchzq",
 )

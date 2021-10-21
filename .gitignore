@@ -1,5 +1,7 @@
-tzq_vocoders/version.py
+vocoders_torchzq/version.py
 __pycache__
 data
 wandb
 runs
+build
+*.egg-info

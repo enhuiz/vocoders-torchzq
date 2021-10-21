@@ -1,24 +1,36 @@
-import random
 import numpy as np
 import torch
 import torchzq
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from pathlib import Path
 from functools import cached_property
 from torch.nn.utils.rnn import pad_sequence
+from mmds.utils.spectrogram import LogMelSpectrogram
+
 
 from ..dataset import AudioDataset
-from ..spectrogram import LogMelSpectrogram
 from .utils import plot_tensor_to_numpy
 
 
 class Runner(torchzq.Runner):
     def __init__(
         self,
-        training_glob: str = "data/train/*.wav",
-        validation_glob: str = "data/val/*.wav",
-        crop_seconds: float = 0.64,
+        # dataset
+        data_root: Path = Path("data/vctk"),
+        wav_folder: str = " wav48_silence_trimmed",
+        wav_suffix: str = ".flac",
+        # mel
+        sample_rate: int = 16000,
+        f_min: int = 55,
+        f_max: int = 7600,
+        hop_length: int = 200,
+        # train
+        trim_seconds: float = 0.6,
+        # eval
         n_demos: int = 4,
         eval_batch_size: int = 8,
+        # misc
         wandb_project: str = "vocoders",
         **kwargs,
     ):
@@ -26,22 +38,42 @@ class Runner(torchzq.Runner):
 
     @cached_property
     def mel_fn(self):
-        # just use the default mel fn
-        return LogMelSpectrogram()
+        args = self.args
+        mel_fn = LogMelSpectrogram(
+            sample_rate=args.sample_rate,
+            f_min=args.f_min,
+            f_max=args.f_max,
+            hop_length=args.hop_length,
+        )
+        print(mel_fn)
+        return mel_fn
 
     def create_dataloader(self, mode):
         args = self.args
 
+        trim_seconds = None if mode == mode.TEST else args.trim_seconds
+
         if mode == mode.TRAIN:
-            pattern = args.training_glob
+            split = "train"
             batch_size = args.batch_size
+            trim_randomly = True
         else:
-            pattern = args.validation_glob
+            split = "val" if mode == mode.VAL else "test"
             batch_size = args.eval_batch_size
+            trim_randomly = False
 
-        dataset = AudioDataset(pattern, self.mel_fn.cpu())
+        dataset = AudioDataset(
+            args.data_root,
+            split,
+            self.mel_fn,
+            trim_randomly,
+            trim_seconds,
+            wav_folder=args.wav_folder,
+            wav_suffix=args.wav_suffix,
+        )
 
-        dataloader = dataset.as_dataloader(
+        dataloader = DataLoader(
+            dataset,
             batch_size=batch_size,
             num_workers=args.nj,
             shuffle=mode == mode.TRAIN,
@@ -52,26 +84,9 @@ class Runner(torchzq.Runner):
 
         return dataloader
 
-    def crop_to_tensor(self, x, rate, mode):
-        args = self.args
-        crop_length = int(rate * args.crop_seconds)
-        if len(x) < crop_length:
-            x = np.pad(x, (0, crop_length - len(x)))
-        if mode == mode.TRAIN:
-            # random crop
-            start = random.randint(0, len(x) - crop_length - 1)
-        else:
-            # center crop
-            start = (len(x) - crop_length) // 2
-        x = x[start : start + crop_length]
-        x = torch.from_numpy(x)
-        return x
-
     def prepare_batch(self, batch, mode):
         mel = batch["mel"]  # list of (t c)
         wav = batch["wav"]  # list of (t)
-        mel = [self.crop_to_tensor(m, self.mel_fn.rate, mode) for m in mel]
-        wav = [self.crop_to_tensor(w, self.mel_fn.sample_rate, mode) for w in wav]
         batch = dict(mel=pad_sequence(mel), wav=pad_sequence(wav))
         return super().prepare_batch(batch, mode)
 
