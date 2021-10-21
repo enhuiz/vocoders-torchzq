@@ -78,11 +78,23 @@ class Runner(torchzq.Runner):
             num_workers=args.nj,
             shuffle=mode == mode.TRAIN,
             drop_last=mode == mode.TRAIN,
+            collate_fn=self.collate,
         )
 
         print("Dataset size:", len(dataset))
 
         return dataloader
+
+    @staticmethod
+    def collate(samples):
+        batch = {}
+        for sample in samples:
+            for k, v in sample.items():
+                if k not in batch:
+                    batch[k] = [v]
+                else:
+                    batch[k].append(v)
+        return batch
 
     def prepare_batch(self, batch, mode):
         mel = batch["mel"]  # list of (t c)
