@@ -10,4 +10,4 @@ train:
   save_every_epoch: 4
   validate_every_epoch: 2
   grad_clip_thres: 1.0
-  lr: "lambda i: 2e-4 * min(i / 2000, 1)"
+  lr: "lambda i: max(4.0e-4 * 0.5 ** (i / 20000), 1e-5)"
