@@ -34,7 +34,7 @@ class AudioSample(MultimodalSample):
         return ret
 
 
-class AudioDataset(Dataset, MultimodalDataset):
+class AudioDataset(MultimodalDataset, Dataset):
     def __init__(
         self,
         root,
