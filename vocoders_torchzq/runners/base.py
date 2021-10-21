@@ -99,7 +99,12 @@ class Runner(torchzq.Runner):
     def prepare_batch(self, batch, mode):
         mel = batch["mel"]  # list of (t c)
         wav = batch["wav"]  # list of (t)
-        batch = dict(mel=pad_sequence(mel), wav=pad_sequence(wav))
+
+        # numpy to padded tensor
+        device = self.args.device
+        n2pt = lambda x: pad_sequence([torch.tensor(xi, device=device) for xi in x])
+        batch = dict(mel=n2pt(mel), wav=n2pt(wav))
+
         return super().prepare_batch(batch, mode)
 
     def training_step(self, batch, _):
