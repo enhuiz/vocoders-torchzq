@@ -18,7 +18,7 @@ class Runner(torchzq.Runner):
         self,
         # dataset
         data_root: Path = Path("data/vctk"),
-        wav_folder: str = " wav48_silence_trimmed",
+        wav_folder: str = "wav48_silence_trimmed",
         wav_suffix: str = ".flac",
         # mel
         sample_rate: int = 16000,
