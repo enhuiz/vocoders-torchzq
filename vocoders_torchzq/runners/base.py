@@ -108,8 +108,9 @@ class Runner(torchzq.Runner):
         return batch
 
     def training_step(self, batch, _):
+        args = self.args
         loss = self.model(x=batch["mel"], y=batch["wav"])
-        return loss, {"loss": loss.item()}
+        return loss, {"loss": loss.item(), "lr": args.lr()}
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
