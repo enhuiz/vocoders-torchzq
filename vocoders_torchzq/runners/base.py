@@ -25,11 +25,10 @@ class Runner(torchzq.Runner):
         f_min: int = 55,
         f_max: int = 7600,
         hop_length: int = 200,
-        # train
+        # train & eval
         trim_seconds: float = 0.6,
-        # eval
-        n_demos: int = 4,
         eval_batch_size: int = 8,
+        n_demos: int = 4,
         # misc
         wandb_project: str = "vocoders",
         **kwargs,
@@ -102,9 +101,20 @@ class Runner(torchzq.Runner):
         return pad_sequence([torch.tensor(xi.squeeze(1), device=device) for xi in x])
 
     def prepare_batch(self, batch, mode):
-        mel = batch["mel"]  # list of (t 1 c)
-        wav = batch["wav"]  # list of (t 1)
-        batch = dict(mel=self.n2pt(mel), wav=self.n2pt(wav))
+        args = self.args
+
+        mel = self.n2pt(batch["mel"])  # list of (t 1 c) -> t b c
+        wav = self.n2pt(batch["wav"])  # list of (t 1) -> t' b c
+
+        wav_length = len(mel) * args.hop_length
+        if len(wav) > wav_length:
+            wav = wav[:wav_length]
+        elif len(wav) < wav_length:
+            wav = F.pad(wav.transpose(0, -1), (0, wav_length - len(wav)))
+            wav = wav.transpose(0, -1)
+
+        batch = dict(mel=mel, wav=wav)
+
         return batch
 
     def training_step(self, batch, _):
