@@ -3,7 +3,6 @@ import attr
 import numpy as np
 import pandas as pd
 from typing import Optional
-from typing import Optional
 from torch.utils.data import Dataset
 from mmds import MultimodalDataset, MultimodalSample
 from mmds.modalities.mel import MelModality
@@ -43,12 +42,13 @@ class AudioDataset(Dataset, MultimodalDataset):
         mel_fn,
         trim_randomly,
         trim_seconds,
+        split_folder="split/110s",
         wav_folder="audio",
         wav_suffix=".wav",
         mel_folder="mel",
         mel_suffix=".npz",
     ):
-        path = (root / split).with_suffix(".csv")
+        path = (root / split_folder / split).with_suffix(".csv")
         df: pd.DataFrame = pd.read_csv(path, sep="|", quoting=csv.QUOTE_NONE, dtype=str)
         df = df.fillna("")
 

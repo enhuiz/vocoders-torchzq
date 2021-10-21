@@ -1,4 +1,4 @@
-runner: python -m tzq_vocoders.runners.universal
+runner: python -m vocoders_torchzq.runners.universal
 
 dist: μlaw
 
