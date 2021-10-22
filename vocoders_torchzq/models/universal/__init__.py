@@ -10,17 +10,16 @@ from typing import Callable
 
 from ..utils import tbc2bct, bct2tbc
 from ..distributions import DiscretizedDistributionLayer
-from ..layers import PositionalEncoding
 
 
 @dataclass(eq=False)
 class UniversalVocoder(nn.Module):
-    dist_fn: Callable[..., DiscretizedDistributionLayer]
+    dist_factory: Callable[..., DiscretizedDistributionLayer]
     sample_rate: int
     hop_length: int
     dim_mel: int
     dim_enc: int = 128
-    dim_emb: int = 256
+    dim_vec: int = 256
     dim_dec: int = 896
     dim_proj: int = 512
 
@@ -32,18 +31,21 @@ class UniversalVocoder(nn.Module):
             num_layers=2,
             bidirectional=True,
         )
-        self.wav_emb = PositionalEncoding(
-            self.dim_emb,
-        )
+
         self.wav_rnn = nn.GRU(
-            2 * self.dim_enc + self.dim_emb,
+            2 * self.dim_enc + self.dim_vec,
             self.dim_dec,
         )
+
         self.proj = nn.Sequential(
             nn.Linear(self.dim_dec, self.dim_proj),
             nn.GELU(),
         )
-        self.dist = self.dist_fn(self.dim_proj)
+
+        self.dist = self.dist_factory(
+            dim_vec=self.dim_vec,
+            dim_proj=self.dim_proj,
+        )
 
     @property
     def device(self):
@@ -79,7 +81,7 @@ class UniversalVocoder(nn.Module):
         w0 = torch.zeros((1, x.shape[1]), device=self.device)
         w = torch.cat([w0, y[:-1]])  # (t b)
 
-        e = self.wav_emb(w)  # (t b d)
+        e = self.dist.vectorize(w)  # (t_w b d)
         o, _ = self.wav_rnn(torch.cat([e, x], dim=-1))
         o = self.proj(o)
 
@@ -104,14 +106,14 @@ class UniversalVocoder(nn.Module):
         w0 = torch.zeros((x.shape[1],), device=self.device)
         w = [w0]
 
+        et = self.dist.vectorize(w0)
         ht = None
         pbar = tqdm.tqdm(x, "Decoding ...") if verbose else x
-        for t, xt in enumerate(pbar):
-            et = self.wav_emb(w[t])
+        for xt in pbar:
             it = torch.cat([et, xt], dim=-1)
             ot, ht = self.wav_rnn(it[None], ht)
             ot = self.proj(ot.squeeze(0))
-            wt = self.dist.sample(ot)
+            wt, et = self.dist.sample(ot, return_vectorized=True)
             w.append(wt)
 
         w = torch.stack(w[1:], dim=1)  # (b t), [1:] to remove w0
@@ -134,7 +136,7 @@ if __name__ == "__main__":
         sample_rate=16_000,
         hop_length=256,
         dim_mel=8,
-        dim_emb=10,
+        dim_vec=10,
         dim_dec=10,
         dim_proj=10,
     )

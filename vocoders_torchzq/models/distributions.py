@@ -2,26 +2,29 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from dataclasses import dataclass
 from torch.distributions import Categorical
-from abc import ABC, abstractmethod
+from functools import partial
 
 
-class DiscretizedDistributionLayer(ABC, nn.Module):
-    def __init__(self, bits=9):
+@dataclass(eq=False)
+class DiscretizedDistributionLayer(nn.Module):
+    bits: int = 9
+    dim_vec: int = 256
+    dim_proj: int = 256
+
+    def __post_init__(self):
         super().__init__()
-        self.bits = bits
+        self.embedding = nn.Embedding(self.num_quants, self.dim_vec)
 
-    @abstractmethod
     def log_prob(self, x, y) -> torch.Tensor:
-        ...
+        raise NotImplementedError
 
-    @abstractmethod
     def neg_log_prob(self, x, y) -> torch.Tensor:
-        ...
+        raise NotImplementedError
 
-    @abstractmethod
-    def sample(self, x) -> torch.Tensor:
-        ...
+    def sample(self, x, return_vectorized=False) -> torch.Tensor:
+        raise NotImplementedError
 
     @property
     def device(self):
@@ -35,14 +38,9 @@ class DiscretizedDistributionLayer(ABC, nn.Module):
     def num_quants_minus_1(self):
         return self.num_quants - 1
 
-
-class RawCategoricalLayer(DiscretizedDistributionLayer):
-    def __init__(self, input_dim, bits=9):
-        super().__init__(bits)
-        self.linear = nn.Linear(input_dim, self.num_quants)
-
-    def log_prob(self, x, y):
-        return self.neg_log_prob(x, y).neg()
+    @classmethod
+    def create_factory(cls, **kwargs):
+        return partial(cls, **kwargs)
 
     def quantize(self, y):
         y = y.clamp(-1, 1)
@@ -51,17 +49,33 @@ class RawCategoricalLayer(DiscretizedDistributionLayer):
     def dequantize(self, y):
         return ((y / self.num_quants_minus_1) * 2 - 1).clamp(-1, 1)
 
+    def vectorize(self, y):
+        return self.embedding(self.quantize(y))
+
+
+@dataclass(eq=False)
+class RawCategoricalLayer(DiscretizedDistributionLayer):
+    def __post_init__(self):
+        super().__post_init__()
+        self.linear = nn.Linear(self.dim_proj, self.num_quants)
+
+    def log_prob(self, x, y):
+        return self.neg_log_prob(x, y).neg()
+
     def neg_log_prob(self, x, y):
         logits = self.linear(x).transpose(-1, -2)  # (t c b)
         return F.cross_entropy(logits, self.quantize(y), reduction="none")
 
-    def sample(self, x):
+    def sample(self, x, return_vectorized=False):
         logits = self.linear(x)
         z = Categorical(logits=logits).sample()
-        z = self.dequantize(z)
-        return z
+        y = self.dequantize(z)
+        if return_vectorized:
+            return y, self.embedding(z)
+        return y
 
 
+@dataclass(eq=False)
 class MuLawCategoricalLayer(RawCategoricalLayer):
     @property
     def μ(self):
@@ -78,11 +92,13 @@ class MuLawCategoricalLayer(RawCategoricalLayer):
         return y.clamp(-1, 1)
 
 
+@dataclass(eq=False)
 class DiscretizedMixtureLogisticsLayer(DiscretizedDistributionLayer):
-    def __init__(self, input_dim, num_mixtures=10):
-        super().__init__(bits=8)
-        self.num_mixtures = num_mixtures
-        self.linear = nn.Linear(input_dim, num_mixtures * 3)
+    num_mixtures: int = 10
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.linear = nn.Linear(self.dim_proj, self.num_mixtures * 3)
 
     def logistics_cdf(self, y, μ, s):
         return ((y - μ) / s).sigmoid()
@@ -116,7 +132,7 @@ class DiscretizedMixtureLogisticsLayer(DiscretizedDistributionLayer):
     def neg_log_prob(self, x, y):
         return self.log_prob(x, y).neg()
 
-    def sample(self, x):
+    def sample(self, x, return_vectorized=False):
         logits, μ, logs = self.linear(x).chunk(3, dim=-1)
 
         k = Categorical(logits=logits).sample().unsqueeze(-1)  # (... 1)
@@ -128,5 +144,8 @@ class DiscretizedMixtureLogisticsLayer(DiscretizedDistributionLayer):
         y = μ + logs.exp() * (p.log() - (1 - p).log())
 
         y = y.clamp(-1, 1)
+
+        if return_vectorized:
+            return y, self.vectorize(y)
 
         return y
