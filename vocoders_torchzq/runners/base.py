@@ -47,6 +47,7 @@ class Runner(torchzq.Runner):
         print(mel_fn)
         return mel_fn
 
+    @property
     def Optimizer(self):
         return torch.optim.AdamW
 
