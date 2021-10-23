@@ -47,6 +47,9 @@ class Runner(torchzq.Runner):
         print(mel_fn)
         return mel_fn
 
+    def Optimizer(self):
+        return torch.optim.AdamW
+
     def create_dataloader(self, mode):
         args = self.args
 
