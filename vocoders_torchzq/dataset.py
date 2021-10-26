@@ -15,6 +15,11 @@ class AudioSample(MultimodalSample):
     trim_randomly: bool
     trim_seconds: Optional[float] = None
 
+    @staticmethod
+    def convert_to_integer(x):
+        assert x.is_integer(), "Random trim only support integer sample rate for now."
+        return int(x)
+
     def generate_info(self):
         if self.trim_seconds is None:
             return {}
@@ -26,8 +31,8 @@ class AudioSample(MultimodalSample):
         # e.g. 16k & 80 hz -> greatest common rate 80hz,
         # -> 1/80 least common period
         lcp = 1 / math.gcd(
-            wav_modality.sample_rate,
-            mel_modality.sample_rate,
+            self.convert_to_integer(wav_modality.sample_rate),
+            self.convert_to_integer(mel_modality.sample_rate),
         )
 
         max_start = mel_modality.duration - self.trim_seconds
