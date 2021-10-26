@@ -17,7 +17,8 @@ class AudioSample(MultimodalSample):
 
     @staticmethod
     def convert_to_integer(x):
-        assert x.is_integer(), "Random trim only support integer sample rate for now."
+        if not float(x).is_integer():
+            raise ValueError("Random trim only supports integer sample rate for now.")
         return int(x)
 
     def generate_info(self):
