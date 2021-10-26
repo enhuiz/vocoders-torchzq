@@ -1,3 +1,4 @@
+import math
 import csv
 import attr
 import numpy as np
@@ -19,13 +20,27 @@ class AudioSample(MultimodalSample):
             return {}
 
         mel_modality = self.get_modality_by_name("mel")
+        wav_modality = self.get_modality_by_name("wav")
 
-        total_seconds = mel_modality.duration
+        # least common period where timesteps overlap
+        # e.g. 16k & 80 hz -> greatest common rate 80hz,
+        # -> 1/80 least common period
+        lcp = 1 / math.gcd(
+            wav_modality.sample_rate,
+            mel_modality.sample_rate,
+        )
+
+        max_start = mel_modality.duration - self.trim_seconds
+        possible_starts = np.arange(0, max_start, lcp)
+
+        if len(possible_starts) == 0:
+            possible_starts = [0]
 
         if self.trim_randomly:
-            t0 = np.random.random() * max(total_seconds - self.trim_seconds, 0)
+            t0 = np.random.choice(possible_starts)
         else:
-            t0 = max((total_seconds - self.trim_seconds) / 2, 0)
+            # center trim
+            t0 = possible_starts[len(possible_starts) // 2]
 
         t1 = t0 + self.trim_seconds
 
