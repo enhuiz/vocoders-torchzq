@@ -18,8 +18,11 @@ class Runner(torchzq.Runner):
         self,
         # dataset
         data_root: Path = Path("data/vctk"),
+        split_folder: str = "split/110s",
         wav_folder: str = "wav48_silence_trimmed",
         wav_suffix: str = ".flac",
+        mel_folder: str = "mel",
+        mel_suffix: str = ".npz",
         # mel
         sample_rate: int = 16000,
         f_min: int = 55,
@@ -71,8 +74,11 @@ class Runner(torchzq.Runner):
             self.mel_fn,
             trim_randomly,
             trim_seconds,
+            split_folder=args.split_folder,
             wav_folder=args.wav_folder,
             wav_suffix=args.wav_suffix,
+            mel_folder=args.mel_folder,
+            mel_suffix=args.mel_suffix,
         )
 
         dataloader = DataLoader(
